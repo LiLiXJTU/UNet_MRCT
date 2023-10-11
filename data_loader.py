@@ -5,10 +5,6 @@ import torch
 from torch.utils import data
 
 
-def unnor(data):
-    data = data * np.std(data)
-    data += np.mean(data)
-    return data
 
 
 def get_data_path():
@@ -34,17 +30,18 @@ class Dataset(data.Dataset):
         self.imgs = imgs
         self.input_shape = shape
 
-    def predict(self, img_path, model, device):
-        cbct, pre = self.read_data(img_path)
-        with torch.no_grad():
-            cbct = cbct.to(device)[None]
-            pre_ct = model(cbct)
-        pre_ct = pre_ct.cpu().numpy()[0, 0]
-        pre_ct = unnor(pre_ct) * .7 + unnor(pre[0].numpy()) * .3
-        return pre_ct
+    # def predict(self, img_path, model, device):
+    #     cbct, pre = self.read_data(img_path)
+    #     with torch.no_grad():
+    #         cbct = cbct.to(device)[None]
+    #         pre_ct = model(cbct)
+    #     pre_ct = pre_ct.cpu().numpy()[0, 0]
+    #     pre_ct = unnor(pre_ct) * .7 + unnor(pre[0].numpy()) * .3
+    #     return pre_ct
 
     def read_data(self, img_path):
         label_path = img_path.replace('/MR/', '/CT/')
+        name = label_path.split('/')[-1][:-4]
         mr = Image.fromarray(np.load(img_path))
         ct = Image.fromarray(np.load(label_path))
         mr = mr.resize((self.input_shape[0], self.input_shape[1]), Image.BICUBIC)
@@ -52,6 +49,8 @@ class Dataset(data.Dataset):
 
         if self.roi:
             roi = np.array(ct, np.float64)
+        mr_mean = np.mean(np.array(mr, np.float64))
+        mr_std = np.std(np.array(mr, np.float64))
         mr = np.array(mr, np.float64) - (np.mean(np.array(mr, np.float64)))
         mr = mr / (np.std(np.array(mr, np.float64)))
         mr = mr[..., None]
@@ -73,23 +72,23 @@ class Dataset(data.Dataset):
         ct = torch.from_numpy(ct).type(torch.FloatTensor)
         # print(jpg.shape)
         if self.roi:
-            return mr, ct, roi, ct_mean,ct_std
+            return mr, ct, roi, ct_mean,ct_std,mr_mean,mr_std,name
         else:
-            return mr, ct, ct_mean,ct_std
+            return mr, ct, ct_mean,ct_std,mr_mean,mr_std,name
 
     def __getitem__(self, index):
         if self.roi:
-            img_x, img_y, roi_x, ct_mean,ct_std = self.read_data(self.imgs[index])
+            img_x, img_y, roi_x, ct_mean,ct_std,mr_mean,mr_std,name = self.read_data(self.imgs[index])
             # print(1)
             # print('ct_mean',ct_mean)
             # print('ct_std', ct_std)
-            return img_x, img_y, roi_x, ct_mean,ct_std
+            return img_x, img_y, roi_x, ct_mean,ct_std,mr_mean,mr_std,name
         else:
-            img_x, img_y, ct_mean,ct_std = self.read_data(self.imgs[index])
+            img_x, img_y, ct_mean,ct_std,mr_mean,mr_std,name = self.read_data(self.imgs[index])
             # print(2)
             # print('ct_mean',ct_mean)
             # print('ct_std', ct_std)
-            return img_x, img_y, ct_mean,ct_std
+            return img_x, img_y, ct_mean,ct_std,mr_mean,mr_std,name
 
     def __len__(self):
         return len(self.imgs)
