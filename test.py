@@ -6,7 +6,7 @@ import tqdm
 from skimage.metrics import structural_similarity as ssim
 import math
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from Src import Unet, Unet_base
+import Unet_base
 from torch.utils import data
 import data_loader
 import os
@@ -32,9 +32,9 @@ def psnr(target, ref):
     return 55 * math.log10(255.0 / rmse)
 
 
-def unnor(data):
-    data = data * 492.5332
-    data += (-440.2342)
+def unnor(data, ct_mean,ct_std):
+    data = data * np.array(ct_std)
+    data += np.array(ct_mean)
     return data
 
 
@@ -55,21 +55,21 @@ if __name__ == '__main__':
     mae = []
     s = []
     rmse = []
-    for i, (images, labels) in enumerate(tqdm.tqdm(val_loader)):
+    for i, (images, labels, ct_mean,ct_std) in enumerate(tqdm.tqdm(val_loader)):
         images = images.to(device)
-        labels = unnor(labels.numpy()[:, 0])
+        labels = unnor(labels.numpy()[:, 0],ct_mean,ct_std)
         with torch.no_grad():
             outputs = model(images)
-        pre = unnor(outputs[:, 0].cpu().numpy())
+        pre = unnor(outputs[:, 0].cpu().numpy(),ct_mean,ct_std)
         ps.append(psnr(labels, pre))
         labels = labels[0]
         pre = pre[0]
         mse.append(mean_squared_error(labels, pre))
         mae.append(mean_absolute_error(labels, pre))
-        nor_label = normalize(labels)
-        nor_pre_ct = normalize(pre)
-        s.append(ssim(nor_label, nor_pre_ct,
-                      data_range=nor_label.max() - nor_label.min()))
+        # nor_label = normalize(labels)
+        # nor_pre_ct = normalize(pre)
+        s.append(ssim(labels, pre,
+                      data_range=4000))
         rmse.append(np.sqrt(mse[-1]))
 
     print('mean mse is : ', np.mean(mse), '±', np.std(mse))

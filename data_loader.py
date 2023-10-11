@@ -12,8 +12,8 @@ def unnor(data):
 
 
 def get_data_path():
-    #path_all = r'D:\data\MR_CT\brain'
-    path_all = '/mnt/sda/li/MR_CT/brain'
+    path_all = r'D:\data\MR_CT\brain'
+    #path_all = '/mnt/sda/li/MR_CT/brain'
     train_files, val_files, test_files = [], [], []
 
     for j, file in enumerate(sorted(os.listdir(path_all))):
@@ -56,6 +56,8 @@ class Dataset(data.Dataset):
         mr = mr / (np.std(np.array(mr, np.float64)))
         mr = mr[..., None]
 
+        ct_mean = np.mean(np.array(ct, np.float64))
+        ct_std = np.std(np.array(ct, np.float64))
         ct = np.array(ct, np.float64) - (np.mean(np.array(ct, np.float64)))
         ct = ct / (np.std(np.array(ct, np.float64)))
         ct = ct[..., None]
@@ -71,18 +73,23 @@ class Dataset(data.Dataset):
         ct = torch.from_numpy(ct).type(torch.FloatTensor)
         # print(jpg.shape)
         if self.roi:
-            return mr, ct, roi
+            return mr, ct, roi, ct_mean,ct_std
         else:
-            return mr, ct
+            return mr, ct, ct_mean,ct_std
 
     def __getitem__(self, index):
         if self.roi:
-            img_x, img_y, roi_x = self.read_data(self.imgs[index])
-            return img_x, img_y, roi_x
+            img_x, img_y, roi_x, ct_mean,ct_std = self.read_data(self.imgs[index])
+            # print(1)
+            # print('ct_mean',ct_mean)
+            # print('ct_std', ct_std)
+            return img_x, img_y, roi_x, ct_mean,ct_std
         else:
-            img_x, img_y = self.read_data(self.imgs[index])
-
-            return img_x, img_y
+            img_x, img_y, ct_mean,ct_std = self.read_data(self.imgs[index])
+            # print(2)
+            # print('ct_mean',ct_mean)
+            # print('ct_std', ct_std)
+            return img_x, img_y, ct_mean,ct_std
 
     def __len__(self):
         return len(self.imgs)
